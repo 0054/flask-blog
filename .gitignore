@@ -1,4 +1,6 @@
 *.swp
+blog/*.swp
 __pycache__/
+blog/__pycache__/
 .vscode
 .venv/
