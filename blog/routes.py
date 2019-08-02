@@ -1,29 +1,30 @@
 #!/usr/bin/env python3
-from flask import render_template, url_for, flash, redirect
+from flask import render_template, url_for, flash, redirect, request
 from blog import app, db, bcrypt
-from blog.forms import RegistrationForm, LoginForm
+from blog.forms import RegistrationForm, LoginForm, PostFrom
 from blog.models import User, Post
-from flask_login import login_user, current_user, logout_user
+from flask_login import login_user, current_user, logout_user, login_required
 
 
-posts = [
-        {
-            'author': 'Author Name',
-            'title': 'Post 1',
-            'content': 'some content',
-            'date_posted': '14 June 2019'
-        },
-        {
-            'author': 'Rob Name',
-            'title': 'Post 2',
-            'content': 'some content 2',
-            'date_posted': '12 June 2019'
-        }
-        ]
+# posts = [
+#         {
+#             'author': 'Author Name',
+#             'title': 'Post 1',
+#             'content': 'some content',
+#             'date_posted': '14 June 2019'
+#         },
+#         {
+#             'author': 'Rob Name',
+#             'title': 'Post 2',
+#             'content': 'some content 2',
+#             'date_posted': '12 June 2019'
+#         }
+#         ]
 
 @app.route('/')
 @app.route('/home')
 def  home():
+    posts = Post.query.all()
     return render_template('home.html', posts=posts)
 
 
@@ -55,7 +56,8 @@ def login():
         user = User.query.filter_by(email=form.email.data).first()
         if user and bcrypt.check_password_hash(user.password, form.password.data):
             login_user(user, remember=form.remember.data)
-            return redirect(url_for('home'))
+            next_page = request.args.get('next')
+            return redirect(next_page) if next_page else redirect(url_for('home'))
             # flash('You have been logged in!', 'success')
         else:
             flash('Login Unsuccessful. Please Check username and password', 'danger')
@@ -66,3 +68,25 @@ def logout():
     logout_user()
     return redirect(url_for('home'))
 
+
+@app.route('/account')
+@login_required
+def account():
+    return render_template('account.html', title='Account')
+
+@app.route('/post/new', methods=['GET', 'POST'])
+@login_required
+def new_post():
+    form = PostFrom()
+    if form.validate_on_submit():
+        post = Post(title=form.title.data, content=form.content.data, author=current_user)
+        db.session.add(post)
+        db.session.commit()
+        flash('Your post has been created!', 'success')
+        return redirect(url_for('home'))
+    return render_template('create_post.html', title='New Post', form=form)
+
+@app.route('/post/<int:post_id>')
+def post(post_id):
+    post = Post.query.get_or_404(post_id)
+    return render_template('post.html', title=post.title, post=post)
